@@ -8,6 +8,18 @@
     <!-- CSP: unsafe-inline/unsafe-eval required by Tailwind CDN + inline scripts. Migrate to Tailwind CLI + external JS for a stricter policy. -->
     <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; font-src https: data:; img-src 'self' data: blob: https:;">
 
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ZeroDebt">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="msapplication-TileColor" content="#2563eb">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -599,7 +611,14 @@ self.onmessage = function(e) {
             edit(id) { const d = AppState.debts.find(x => x.id === id); document.getElementById('debt-id').value = id; ['name','category','interest','initial','current','payment'].forEach(k => document.getElementById(`debt-${k}`).value = d[k==='interest'?'interest_rate':k==='initial'?'initial_balance':k==='current'?'current_balance':k==='payment'?'min_payment':k]); document.getElementById('modal-debt-title').innerText = "แก้ไขข้อมูล"; document.getElementById('btnDeleteDebt').classList.remove('hidden'); UIManager.openModal('modal-debt'); }
         };
 
-        window.onload = () => App.init();
+        window.onload = () => {
+            App.init();
+            // Register Service Worker for PWA / offline support
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/ZeroDebt/sw.js')
+                    .catch(() => {}); // silently fail in non-HTTPS dev environments
+            }
+        };
     </script>
 </body>
 </html>
