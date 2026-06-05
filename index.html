@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="th" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Debt Manager AI (S26 Ultra)</title>
+
+    <!-- CSP: unsafe-inline/unsafe-eval required by Tailwind CDN + inline scripts. Migrate to Tailwind CLI + external JS for a stricter policy. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; font-src https: data:; img-src 'self' data: blob: https:;">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb', secondary: '#4f46e5', danger: '#ef4444', success: '#10b981',
+                        amoled: '#000000', darkcard: '#121212', darkborder: '#27272a'
+                    },
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    boxShadow: { 'soft': '0 20px 40px -15px rgba(0,0,0,0.05)', 'glow': '0 0 20px rgba(37, 99, 235, 0.5)', 'dark-glow': '0 0 20px rgba(59, 130, 246, 0.2)' }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #f1f5f9; overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; transition: background-color 0.3s ease; }
+        .dark body { background-color: #000000; }
+        .bg-mesh { background-color: #f8fafc; background-image: radial-gradient(at 0% 0%, hsla(217,100%,70%,0.15) 0px, transparent 50%), radial-gradient(at 100% 0%, hsla(250,100%,75%,0.15) 0px, transparent 50%); }
+        .dark .bg-mesh { background-color: #000000; background-image: radial-gradient(at 0% 0%, hsla(217,100%,70%,0.08) 0px, transparent 50%), radial-gradient(at 100% 0%, hsla(250,100%,75%,0.08) 0px, transparent 50%); }
+        .glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid rgba(255,255,255,0.5); }
+        .dark .glass-nav { background: rgba(18, 18, 18, 0.85); border-color: #27272a; }
+        .modern-input { background-color: #f1f5f9; border: 1px solid transparent; transition: all 0.3s ease; }
+        .modern-input:focus { background-color: #ffffff; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); outline: none; }
+        .dark .modern-input { background-color: #1a1a1c; color: #f4f4f5; border-color: #27272a; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-up { animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .progress-fill { transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1); }
+        .toast { transform: translateY(-150%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .toast.show { transform: translateY(0); }
+        .privacy-mode .money-text { filter: blur(7px); opacity: 0.7; pointer-events: none; transition: all 0.4s ease; }
+        #splash-screen { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: #fff; }
+        #splash-screen.hidden { opacity: 0; visibility: hidden; transition: opacity 0.8s ease, visibility 0.8s; }
+        .pulse-loader { width: 80px; height: 80px; border-radius: 50%; background: rgba(37, 99, 235, 0.4); animation: pulse-anim 2s infinite; display: flex; align-items: center; justify-content: center; }
+        @keyframes pulse-anim { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 30px rgba(37, 99, 235, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); } }
+        #confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 9000; }
+        #spen-canvas { touch-action: none; }
+    </style>
+</head>
+<body class="h-[100svh] w-full overflow-hidden flex justify-center text-slate-800 dark:text-slate-100 relative">
+
+    <div id="splash-screen">
+        <div class="pulse-loader mb-6"><i class="fa-solid fa-fingerprint text-4xl text-primary"></i></div>
+        <h1 class="text-xl font-bold tracking-tight">Debt Manager <span class="text-primary">AI</span></h1>
+        <p class="text-[10px] text-slate-500 uppercase tracking-widest mt-2">S26 Ultra Super-Resolution...</p>
+    </div>
+
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="relative w-full max-w-md h-full flex flex-col bg-mesh overflow-hidden sm:shadow-2xl">
+
+        <!-- Header -->
+        <header class="z-20 px-6 pt-10 pb-4 flex justify-between items-center shrink-0">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight dark:text-white">Debt <span class="bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">Manager</span></h1>
+                <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">S26 Ultra Edition</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="btnPrivacy" class="w-10 h-10 rounded-2xl bg-white dark:bg-darkcard shadow-soft flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-primary border dark:border-darkborder transition-all active:scale-90"><i class="fa-solid fa-eye" id="icon-privacy"></i></button>
+                <button id="btnSettings" class="w-10 h-10 rounded-2xl bg-white dark:bg-darkcard shadow-soft flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-primary border dark:border-darkborder transition-all active:scale-90"><i class="fa-solid fa-bars-staggered"></i></button>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto no-scrollbar px-5 pb-32" id="main-content">
+
+            <!-- VIEW: DASHBOARD -->
+            <div id="view-dashboard" class="view-section animate-fade-up">
+                <div class="rounded-[2.5rem] bg-gradient-to-br from-slate-900 to-slate-800 dark:from-[#050505] dark:to-[#111] p-7 mb-4 text-white shadow-2xl relative overflow-hidden border border-slate-700 dark:border-darkborder text-center">
+                    <div class="absolute top-0 right-0 w-48 h-48 bg-primary opacity-20 rounded-full -mr-12 -mt-12 blur-3xl"></div>
+                    <div class="relative z-10">
+                        <div class="flex justify-between w-full mb-6">
+                            <div class="text-left">
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest">อิสรภาพทางการเงินในปี</p>
+                                <h2 class="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400" id="dash-free-year">20XX</h2>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest">Health Score</p>
+                                <h2 class="text-2xl font-bold text-success" id="dash-health-score">0</h2>
+                            </div>
+                        </div>
+                        <div class="w-full bg-white/10 rounded-3xl p-5 backdrop-blur-xl border border-white/5">
+                            <p class="text-xs text-slate-300 mb-1">ยอดหนี้คงเหลือรวมทั้งหมด</p>
+                            <div class="text-3xl font-bold money-text" id="dash-total-debt">฿0</div>
+                            <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden mt-4"><div class="h-full bg-gradient-to-r from-blue-500 to-emerald-400 progress-fill" id="dash-progress-bar" style="width: 0%"></div></div>
+                            <div class="flex justify-between mt-2 text-[10px] text-slate-400">
+                                <span>ความคืบหน้า <span id="dash-progress" class="text-success font-bold">0%</span></span>
+                                <span>จ่ายแล้ว: <span id="dash-paid-total" class="money-text">฿0</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-white dark:bg-darkcard rounded-3xl p-5 shadow-soft border border-slate-100 dark:border-darkborder">
+                        <p class="text-[10px] text-slate-400 uppercase font-bold mb-1"><i class="fa-solid fa-bolt text-danger mr-1"></i> ดอกเบี้ยละลาย/เดือน</p>
+                        <p class="text-lg font-bold text-danger money-text" id="dash-interest-burn">฿0</p>
+                    </div>
+                    <div class="bg-white dark:bg-darkcard rounded-3xl p-5 shadow-soft border border-slate-100 dark:border-darkborder">
+                        <p class="text-[10px] text-slate-400 uppercase font-bold mb-1"><i class="fa-solid fa-calendar-check text-primary mr-1"></i> ยอดผ่อนรวม/เดือน</p>
+                        <p class="text-lg font-bold money-text" id="dash-monthly-pay">฿0</p>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-3xl p-5 mb-4 border border-primary/20 flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center text-xl shadow-lg shrink-0"><i class="fa-solid fa-bullseye"></i></div>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-bold text-primary uppercase mb-0.5">เป้าหมายโปะสูงสุด (Snowball/Avalanche)</p>
+                        <p class="text-sm font-bold truncate" id="dash-target-name">รอข้อมูล...</p>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-darkcard rounded-[2rem] p-5 shadow-soft border border-slate-100 dark:border-darkborder mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-sm font-bold">สัดส่วนหนี้สินเชิงลึก</h3>
+                        <div class="flex bg-slate-100 dark:bg-black p-1 rounded-xl">
+                            <button onclick="UIManager.toggleChart('donut')" id="btnChartDonut" class="px-3 py-1 text-[10px] font-bold rounded-lg bg-white dark:bg-darkcard shadow-sm">สัดส่วน</button>
+                            <button onclick="UIManager.toggleChart('line')" id="btnChartLine" class="px-3 py-1 text-[10px] font-bold rounded-lg text-slate-400">แนวโน้ม</button>
+                        </div>
+                    </div>
+                    <div class="relative h-48 w-full flex justify-center items-center">
+                        <canvas id="debtChart"></canvas>
+                        <canvas id="trendChart" class="hidden"></canvas>
+                    </div>
+                    <div id="chart-legend-details" class="mt-6 space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- VIEW: DEBTS (Portfolio) -->
+            <div id="view-debts" class="view-section hidden animate-fade-up">
+                <div class="flex justify-between items-end mb-4 px-1">
+                    <div><h2 class="text-xl font-bold">Debt Portfolio</h2><span class="text-[10px] text-slate-500" id="debt-count">0 รายการ</span></div>
+                    <div class="relative"><select id="sort-debts" class="appearance-none bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder text-xs font-bold py-2 pl-3 pr-8 rounded-xl outline-none cursor-pointer"><option value="balance_desc">ยอดคงเหลือ: มาก -> น้อย</option><option value="interest_desc">ดอกเบี้ย: สูง -> ต่ำ</option><option value="progress_desc">ใกล้หมด -> เริ่มต้น</option></select><i class="fa-solid fa-sort absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]"></i></div>
+                </div>
+                <div id="debt-list" class="space-y-4"></div>
+                <div id="debt-empty" class="hidden flex flex-col items-center justify-center py-16 text-slate-300"><i class="fa-solid fa-folder-open text-5xl mb-4"></i><p class="font-bold">ยังไม่มีข้อมูลหนี้สิน</p></div>
+            </div>
+
+            <!-- VIEW: AI ADVISOR -->
+            <div id="view-ai" class="view-section hidden h-full flex flex-col animate-fade-up">
+                <div class="bg-gradient-to-r from-secondary to-primary rounded-[2.5rem] p-6 mb-4 flex items-center gap-4 shadow-xl text-white shrink-0">
+                    <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner"><i class="fa-solid fa-robot"></i></div>
+                    <div><h2 class="font-bold text-lg leading-tight">Gemini S26 Advisor</h2><p class="text-[11px] opacity-80">พร้อมวิเคราะห์แผนปลดหนี้ของคุณ</p></div>
+                </div>
+                <div id="chat-history" class="flex-1 overflow-y-auto bg-white dark:bg-darkcard rounded-[2rem] p-5 mb-4 space-y-4 text-sm no-scrollbar border dark:border-darkborder shadow-inner"></div>
+                <div class="flex gap-2 shrink-0">
+                    <button id="btnVoice" class="w-14 h-14 rounded-2xl bg-danger text-white flex items-center justify-center shadow-lg transition-all active:scale-95"><i class="fa-solid fa-microphone"></i></button>
+                    <input type="text" id="ai-input" class="flex-1 modern-input rounded-2xl px-5 py-3.5 text-sm" placeholder="ถาม AI เกี่ยวกับการปลดหนี้...">
+                    <button id="btnSendAI" class="w-14 h-14 rounded-2xl bg-slate-800 dark:bg-primary text-white flex items-center justify-center shadow-lg transition-all active:scale-95"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </main>
+
+        <button id="fabAdd" class="absolute bottom-28 right-6 w-16 h-16 rounded-full bg-primary text-white shadow-glow dark:shadow-dark-glow flex items-center justify-center text-2xl transition-all active:scale-90 z-30"><i class="fa-solid fa-plus"></i></button>
+
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-40">
+            <nav class="glass-nav rounded-[2.5rem] p-2 flex justify-between items-center">
+                <button class="nav-btn w-1/3 flex flex-col items-center py-3 rounded-3xl text-primary bg-primary/10 transition-all" data-target="view-dashboard"><i class="fa-solid fa-chart-pie text-xl mb-1"></i><span class="text-[9px] font-bold uppercase tracking-widest">สรุปผล</span></button>
+                <button class="nav-btn w-1/3 flex flex-col items-center py-3 rounded-3xl text-slate-400 transition-all" data-target="view-debts"><i class="fa-solid fa-wallet text-xl mb-1"></i><span class="text-[9px] font-bold uppercase tracking-widest">หนี้สิน</span></button>
+                <button class="nav-btn w-1/3 flex flex-col items-center py-3 rounded-3xl text-slate-400 transition-all" data-target="view-ai"><i class="fa-solid fa-wand-magic-sparkles text-xl mb-1"></i><span class="text-[9px] font-bold uppercase tracking-widest">AI ช่วยเหลือ</span></button>
+            </nav>
+        </div>
+
+        <!-- MODAL: ADD/EDIT -->
+        <div id="modal-debt" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex-col justify-end backdrop-blur-sm transition-opacity opacity-0">
+            <div class="modal-content bg-white dark:bg-darkcard w-full max-w-md mx-auto rounded-t-[2.5rem] flex flex-col max-h-[90svh] transform translate-y-full transition-transform duration-500 ease-out">
+                <div class="flex justify-between items-center p-7 pb-4 shrink-0">
+                    <h2 class="text-xl font-black" id="modal-debt-title">บันทึกข้อมูลหนี้</h2>
+                    <button id="btnCloseDebtModal" class="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-[#1a1a1c] flex items-center justify-center"><i class="fa-solid fa-times"></i></button>
+                </div>
+                <div class="flex-1 overflow-y-auto no-scrollbar p-7 pt-2">
+                    <form id="form-debt" class="space-y-5 pb-12">
+                        <input type="hidden" id="debt-id">
+                        <div><label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">ชื่อรายการหนี้</label><input type="text" id="debt-name" required class="w-full modern-input rounded-2xl px-5 py-4 text-sm font-bold"></div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">ประเภท</label><select id="debt-category" class="w-full modern-input rounded-2xl px-4 py-4 text-sm appearance-none"><option value="home">🏡 บ้าน/คอนโด</option><option value="car">🚗 รถยนต์</option><option value="card">💳 บัตรเครดิต</option><option value="cashcard">🏧 บัตรกดเงินสด</option><option value="personal">👤 สินเชื่อบุคคล</option><option value="education">🎓 กยศ.</option><option value="business">🏢 ธุรกิจ</option><option value="informal">🤝 นอกระบบ</option><option value="other">📦 อื่นๆ</option></select></div>
+                            <div><label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">ดอกเบี้ย (% ต่อปี)</label><input type="number" id="debt-interest" step="0.01" required class="w-full modern-input rounded-2xl px-4 py-4 text-sm font-bold"></div>
+                        </div>
+                        <div><label class="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 ml-1">ยอดเริ่มต้นตอนกู้ (บาท)</label><input type="number" id="debt-initial" required class="w-full modern-input rounded-2xl px-5 py-4 text-sm"></div>
+                        <div><label class="block text-[10px] font-bold uppercase tracking-widest text-danger mb-2 ml-1">ยอดหนี้คงเหลือปัจจุบัน (บาท)</label><input type="number" id="debt-current" required class="w-full modern-input rounded-2xl px-5 py-4 text-lg font-black text-danger"></div>
+                        <div><label class="block text-[10px] font-bold uppercase tracking-widest text-primary mb-2 ml-1">ยอดที่ต้องผ่อน/เดือน (บาท)</label><input type="number" id="debt-payment" required class="w-full modern-input rounded-2xl px-5 py-4 text-lg font-black text-primary"></div>
+                        <div class="pt-4 flex gap-3"><button type="button" id="btnDeleteDebt" class="hidden w-16 bg-danger/10 text-danger rounded-2xl flex items-center justify-center"><i class="fa-solid fa-trash-can"></i></button><button type="submit" class="flex-1 bg-primary text-white font-black py-5 rounded-2xl shadow-glow active:scale-95 transition-all">บันทึกข้อมูล</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: PAYMENT -->
+        <div id="modal-pay" class="fixed inset-0 bg-slate-900/70 z-50 hidden flex items-center justify-center backdrop-blur-md opacity-0 transition-opacity">
+            <div class="modal-content bg-white dark:bg-darkcard w-[90%] max-w-sm rounded-[2.5rem] p-7 transform scale-90 transition-all duration-300 border dark:border-darkborder shadow-2xl text-center">
+                <div class="flex justify-between items-start mb-6"><div class="w-14 h-14 bg-success/20 rounded-2xl flex items-center justify-center text-success text-2xl"><i class="fa-solid fa-hand-holding-dollar"></i></div><label for="slip-upload" class="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-primary text-xl cursor-pointer hover:bg-blue-100 active:scale-90"><i class="fa-solid fa-camera"></i><input type="file" id="slip-upload" accept="image/*" capture="environment" hidden></label></div>
+                <h2 class="text-xl font-black mb-1">บันทึกการจ่ายเงิน</h2>
+                <p class="text-xs text-slate-500 mb-6">สำหรับรายการ: <strong id="pay-debt-name" class="text-slate-800 dark:text-white">...</strong></p>
+                <form id="form-pay" class="space-y-4">
+                    <input type="hidden" id="pay-debt-id">
+                    <div class="relative"><input type="number" id="pay-amount" required class="w-full modern-input rounded-2xl px-6 py-5 text-2xl font-black text-center" placeholder="0.00"><div id="ocr-loading" class="absolute right-4 top-1/2 -translate-y-1/2 hidden"><i class="fa-solid fa-spinner fa-spin text-primary"></i></div></div>
+                    <div class="flex gap-3 mt-8"><button type="button" id="btnCancelPay" class="flex-1 bg-slate-100 dark:bg-white/5 py-4 rounded-2xl font-bold">ยกเลิก</button><button type="submit" class="flex-1 bg-success text-white py-4 rounded-2xl font-black shadow-lg">ยืนยันการจ่าย</button></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL: SETTINGS -->
+        <div id="modal-settings" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex-col justify-end backdrop-blur-sm opacity-0 transition-opacity">
+            <div class="modal-content bg-white dark:bg-darkcard w-full max-w-md mx-auto rounded-t-[2.5rem] flex flex-col max-h-[85svh] transform translate-y-full transition-all duration-400">
+                <div class="flex justify-between items-center p-8 border-b dark:border-darkborder shrink-0"><h2 class="text-xl font-black">การตั้งค่าระบบ</h2><button id="btnCloseSettings" class="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center"><i class="fa-solid fa-times"></i></button></div>
+                <div class="p-8 overflow-y-auto space-y-6">
+                    <div class="bg-slate-50 dark:bg-white/5 p-6 rounded-3xl flex justify-between items-center"><div><h3 class="font-black text-sm">AMOLED Dark Mode</h3><p class="text-[10px] text-slate-500">ถนอมสายตาและประหยัดแบตเตอรี่</p></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="toggleDarkMode" class="sr-only peer"><div class="w-12 h-6 bg-gray-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div></label></div>
+                    <div class="bg-slate-50 dark:bg-white/5 p-6 rounded-3xl"><h3 class="font-black text-sm mb-3">Gemini API Key</h3><div class="flex gap-2"><input type="password" id="input-apikey" placeholder="วาง API Key ตรงนี้..." class="flex-1 modern-input rounded-2xl px-4 py-3 text-sm"><button id="btnSaveKey" class="bg-primary text-white px-4 py-3 rounded-2xl font-bold shadow-md">บันทึก</button></div></div>
+                    <div class="grid grid-cols-2 gap-3"><button id="btnExport" class="bg-slate-50 dark:bg-white/5 py-4 rounded-3xl text-[10px] font-black flex flex-col items-center gap-1 border border-slate-100 dark:border-white/5"><i class="fa-solid fa-cloud-arrow-down text-lg text-primary"></i> ส่งออกข้อมูล</button><button class="bg-slate-50 dark:bg-white/5 py-4 rounded-3xl text-[10px] font-black flex flex-col items-center gap-1 border border-slate-100 dark:border-white/5 relative"><i class="fa-solid fa-cloud-arrow-up text-lg text-secondary"></i> นำเข้าข้อมูล<input type="file" id="file-import" accept=".json" class="absolute inset-0 opacity-0 cursor-pointer"></button></div>
+                    <button id="btnClearData" class="w-full bg-danger/10 text-danger py-4 rounded-3xl text-[10px] font-black uppercase tracking-widest border border-danger/20">ล้างข้อมูลทั้งหมดในเครื่อง</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast" class="toast fixed top-6 left-1/2 -translate-x-1/2 z-[10000] bg-slate-900/95 dark:bg-white/10 backdrop-blur-2xl text-white px-6 py-4 rounded-3xl shadow-2xl text-sm flex items-center gap-4 hidden border border-white/10"><i class="fa-solid fa-check-circle text-success text-xl" id="toast-icon"></i><span id="toast-msg" class="font-bold">ข้อความ</span></div>
+    </div>
+
+    <!-- CORE ENGINE -->
+    <script>
+        const apiKey = ""; // API Key Injection (set via Settings UI)
+
+        // ─── Named constants (replaces magic numbers) ──────────────────────────
+        const INFINITE_MONTHS    = 999;  // sentinel: payment can't cover interest
+        const INFINITE_THRESHOLD = 900;  // upper bound for "realistic" payoff months
+        const HEALTH_DEBT_SCALE  = 100_000;
+        const HEALTH_INT_SCALE   = 100;
+
+        const CONFIG = {
+            dbName: 'DebtManagerS26DB', dbVersion: 3, stores: { debts: 'debts', tx: 'transactions' },
+            colors: {
+                home:      { fill: '#2563eb', label: 'บ้าน/ที่ดิน' },
+                car:       { fill: '#f59e0b', label: 'ยานพาหนะ' },
+                card:      { fill: '#ef4444', label: 'บัตรเครดิต' },
+                cashcard:  { fill: '#e11d48', label: 'บัตรกดเงินสด' },
+                personal:  { fill: '#8b5cf6', label: 'สินเชื่อบุคคล' },
+                education: { fill: '#0d9488', label: 'กยศ./การศึกษา' },
+                business:  { fill: '#475569', label: 'ธุรกิจ/SME' },
+                informal:  { fill: '#ea580c', label: 'หนี้นอกระบบ' },
+                other:     { fill: '#9ca3af', label: 'อื่นๆ' }
+            }
+        };
+
+        const formatMoney = (amount) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+        const generateId  = () => crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
+        // Escape user content before inserting into innerHTML (XSS prevention)
+        const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+        const showToast = (msg, type = 'success') => {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-icon').className = type === 'error'
+                ? 'fa-solid fa-circle-exclamation text-danger text-xl'
+                : 'fa-solid fa-check-circle text-success text-xl';
+            document.getElementById('toast-msg').textContent = msg;
+            t.classList.remove('hidden');
+            requestAnimationFrame(() => t.classList.add('show'));
+            clearTimeout(t._timer);
+            t._timer = setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.classList.add('hidden'), 400); }, 2500);
+        };
+
+        const Haptic = {
+            play(type = 'success') {
+                if (!navigator.vibrate) return;
+                const p = type === 'success' ? [30, 50, 30] : type === 'error' ? [50, 100, 50, 100] : type === 'celebrate' ? [100, 50, 100, 50, 300] : 15;
+                navigator.vibrate(p);
+            }
+        };
+
+        const UIManager = {
+            openModal(id) {
+                Haptic.play('click');
+                const m = document.getElementById(id);
+                const c = m.querySelector('.modal-content') || m.children[0];
+                m.classList.remove('hidden');
+                setTimeout(() => { m.classList.remove('opacity-0'); if (c.classList.contains('transform')) c.classList.remove('translate-y-full', 'scale-90'); }, 10);
+            },
+            closeModal(id) {
+                const m = document.getElementById(id);
+                const c = m.querySelector('.modal-content') || m.children[0];
+                m.classList.add('opacity-0');
+                if (c.classList.contains('transform')) c.classList.add('translate-y-full', 'scale-90');
+                setTimeout(() => m.classList.add('hidden'), 500);
+            },
+            switchView(id) {
+                Haptic.play('click');
+                document.querySelectorAll('.view-section').forEach(v => v.classList.add('hidden'));
+                document.getElementById(id).classList.remove('hidden');
+                document.querySelectorAll('.nav-btn').forEach(b => {
+                    b.classList.remove('text-primary', 'bg-primary/10');
+                    b.classList.add('text-slate-400');
+                    if (b.dataset.target === id) { b.classList.add('text-primary', 'bg-primary/10'); b.classList.remove('text-slate-400'); }
+                });
+                document.getElementById('fabAdd').style.display = (id === 'view-ai') ? 'none' : 'flex';
+                if (id === 'view-dashboard') this.renderCharts();
+            },
+            toggleChart(type) {
+                const donut = document.getElementById('debtChart'), trend = document.getElementById('trendChart');
+                const btnD = document.getElementById('btnChartDonut'), btnT = document.getElementById('btnChartLine');
+                if (type === 'donut') { donut.classList.remove('hidden'); trend.classList.add('hidden'); btnD.classList.add('bg-white', 'dark:bg-darkcard', 'shadow-sm'); btnD.classList.remove('text-slate-400'); btnT.classList.add('text-slate-400'); btnT.classList.remove('bg-white', 'dark:bg-darkcard', 'shadow-sm'); }
+                else { trend.classList.remove('hidden'); donut.classList.add('hidden'); btnT.classList.add('bg-white', 'dark:bg-darkcard', 'shadow-sm'); btnT.classList.remove('text-slate-400'); btnD.classList.add('text-slate-400'); btnD.classList.remove('bg-white', 'dark:bg-darkcard', 'shadow-sm'); }
+                this.renderCharts();
+            },
+            renderCharts() {
+                if (!AppState.debts.length) return;
+                const ctxD = document.getElementById('debtChart').getContext('2d'), ctxT = document.getElementById('trendChart').getContext('2d');
+                const totals = {}; Object.keys(CONFIG.colors).forEach(k => totals[k] = 0);
+                AppState.debts.forEach(d => { totals[d.category] = (totals[d.category] || 0) + d.current_balance; });
+                const active = Object.keys(totals).filter(k => totals[k] > 0);
+
+                document.getElementById('chart-legend-details').innerHTML = active.map(k => {
+                    const amt = totals[k], pct = AppState.metrics.totalDebt > 0 ? ((amt / AppState.metrics.totalDebt) * 100).toFixed(1) : 0;
+                    return `<div class="flex items-center justify-between text-xs font-bold"><div class="flex items-center gap-3"><div class="w-3 h-3 rounded-full" style="background-color: ${CONFIG.colors[k].fill}"></div><span class="text-slate-500">${CONFIG.colors[k].label}</span></div><div class="money-text">฿${formatMoney(amt)} <span class="text-[9px] text-slate-400 font-normal">(${pct}%)</span></div></div>`;
+                }).join('');
+
+                if (AppState.chart) AppState.chart.destroy();
+                AppState.chart = new Chart(ctxD, { type: 'doughnut', data: { labels: active.map(k => CONFIG.colors[k].label), datasets: [{ data: active.map(k => totals[k]), backgroundColor: active.map(k => CONFIG.colors[k].fill), borderWidth: 0, hoverOffset: 10 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '80%', plugins: { legend: { display: false } } } });
+
+                if (AppState.trendChart) AppState.trendChart.destroy();
+                const hist = AppState.metrics.history || {}; const labels = Object.keys(hist).sort();
+                AppState.trendChart = new Chart(ctxT, { type: 'line', data: { labels: labels.length ? labels : ['No Data'], datasets: [{ label: 'ยอดจ่าย', data: labels.map(l => hist[l]), borderColor: '#2563eb', tension: 0.4, fill: true, backgroundColor: 'rgba(37,99,235,0.05)', pointBackgroundColor: '#2563eb' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { display: false }, x: { grid: { display: false } } } } });
+            }
+        };
+
+        const Confetti = {
+            shoot() {
+                Haptic.play('celebrate');
+                const canvas = document.getElementById('confetti-canvas'), ctx = canvas.getContext('2d');
+                canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+                const p = []; const colors = ['#2563eb', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6'];
+                for (let i = 0; i < 150; i++) p.push({ x: canvas.width/2, y: canvas.height/1.2, r: Math.random()*7+3, dx: Math.random()*12-6, dy: Math.random()*-20-5, c: colors[Math.floor(Math.random()*colors.length)], alpha: 1 });
+                const run = () => { ctx.clearRect(0,0,canvas.width,canvas.height); let active = false; p.forEach(it => { it.dy += 0.4; it.x += it.dx; it.y += it.dy; if (it.y < canvas.height) active = true; ctx.globalAlpha = it.alpha; ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, Math.PI*2); ctx.fillStyle = it.c; ctx.fill(); }); if (active) requestAnimationFrame(run); else ctx.clearRect(0,0,canvas.width,canvas.height); }; run();
+            }
+        };
+
+        class DBManager {
+            constructor() { this.db = null; }
+            async init() {
+                return new Promise((resolve, reject) => {
+                    const req = indexedDB.open(CONFIG.dbName, CONFIG.dbVersion);
+                    req.onupgradeneeded = e => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains(CONFIG.stores.debts)) db.createObjectStore(CONFIG.stores.debts, { keyPath: 'id' });
+                        if (!db.objectStoreNames.contains(CONFIG.stores.tx)) db.createObjectStore(CONFIG.stores.tx, { keyPath: 'id' }).createIndex('debt_id', 'debt_id', { unique: false });
+                    };
+                    req.onsuccess = e => { this.db = e.target.result; resolve(); };
+                    req.onerror  = e => reject(e.target.error);
+                });
+            }
+            async getAll(s) { return new Promise((resolve, reject) => { const req = this.db.transaction(s,'readonly').objectStore(s).getAll(); req.onsuccess = e => resolve(e.target.result); req.onerror = e => reject(e.target.error); }); }
+            async save(s, i) { return new Promise((resolve, reject) => { const req = this.db.transaction(s,'readwrite').objectStore(s).put(i); req.onsuccess = e => resolve(e.target.result); req.onerror = e => reject(e.target.error); }); }
+            async delete(s, id) { return new Promise((resolve, reject) => { const req = this.db.transaction(s,'readwrite').objectStore(s).delete(id); req.onsuccess = () => resolve(); req.onerror = e => reject(e.target.error); }); }
+            async clear() { return new Promise((resolve, reject) => { const t = this.db.transaction([CONFIG.stores.debts, CONFIG.stores.tx], 'readwrite'); t.objectStore(CONFIG.stores.debts).clear(); t.objectStore(CONFIG.stores.tx).clear(); t.oncomplete = () => resolve(); t.onerror = e => reject(e.target.error); }); }
+        }
+        const db = new DBManager();
+
+        // Web Worker — amortization calculations (constants injected via template literal)
+        const workerCode = `
+const INFINITE_MONTHS    = ${INFINITE_MONTHS};
+const INFINITE_THRESHOLD = ${INFINITE_THRESHOLD};
+const HEALTH_DEBT_SCALE  = ${HEALTH_DEBT_SCALE};
+const HEALTH_INT_SCALE   = ${HEALTH_INT_SCALE};
+
+self.onmessage = function(e) {
+    const { type, payload, transactions } = e.data;
+    if (type !== 'CALCULATE_METRICS') return;
+
+    let totalDebt = 0, totalMonthly = 0, initialTotal = 0, interestBurn = 0, maxMonths = 0, highestRate = -1, target = 'None';
+
+    const processed = (payload || []).map(d => {
+        totalDebt += d.current_balance; totalMonthly += d.min_payment; initialTotal += d.initial_balance;
+        const P = d.current_balance, A = d.min_payment;
+        const r = (d.interest_rate / 100) / 12;
+        interestBurn += (P * r);
+        if (P > 0 && d.interest_rate > highestRate) { highestRate = d.interest_rate; target = d.name; }
+
+        // n = -ln(1 - rP/A) / ln(1+r)
+        let n = 0, warning = false, freedomDate = 'N/A';
+        if (P <= 0) {
+            n = 0;
+        } else if (r === 0) {
+            n = P / A;
+        } else if (A <= P * r) {
+            n = INFINITE_MONTHS; // payment cannot cover interest
+            warning = true;
+        } else {
+            n = -Math.log(1 - (r * P / A)) / Math.log(1 + r);
+        }
+
+        if (!warning && n < INFINITE_MONTHS && n > 0) {
+            const date = new Date();
+            date.setMonth(date.getMonth() + Math.ceil(n));
+            freedomDate = date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        if (n < INFINITE_THRESHOLD && n > maxMonths) maxMonths = n;
+
+        return { ...d, monthsLeft: warning ? '⚠️ ไม่จบสิ้น' : Math.ceil(n), freedomDate, warning,
+            p: d.initial_balance > 0 ? Math.min(100, ((d.initial_balance - d.current_balance) / d.initial_balance) * 100).toFixed(2) : 0 };
+    });
+
+    const overallP = initialTotal > 0 ? (((initialTotal - totalDebt) / initialTotal) * 100).toFixed(2) : 0;
+    // Freedom year in Thai Buddhist Era (CE + 543)
+    const freeYear = maxMonths > 0 && maxMonths < INFINITE_THRESHOLD
+        ? Math.ceil(new Date().getFullYear() + 543 + (maxMonths / 12))
+        : 'N/A';
+    const healthScore = Math.min(100, Math.max(0,
+        100 - (totalDebt / HEALTH_DEBT_SCALE) - (interestBurn / HEALTH_INT_SCALE) + parseFloat(overallP)
+    )).toFixed(0);
+
+    const history = {};
+    (transactions || []).forEach(t => { const mo = t.date.substring(0,7); history[mo] = (history[mo] || 0) + t.amount_paid; });
+
+    self.postMessage({ type: 'RESULT', data: { debts: processed, totalDebt, totalMonthly, overallP, interestBurn, target, freeYear, initialTotal, healthScore, history } });
+};`;
+        const worker = new Worker(URL.createObjectURL(new Blob([workerCode], { type: 'application/javascript' })));
+        worker.onerror = () => showToast("เกิดข้อผิดพลาดในการคำนวณ", "error");
+
+        class AIService {
+            static getKey() { return localStorage.getItem('_gemini_api_key') || apiKey || ""; }
+            static async call(payload) {
+                const k = this.getKey(); if (!k) throw new Error("API_KEY_MISSING");
+                // Using stable gemini-2.0-flash model
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${k}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!res.ok) throw new Error("API_FAIL");
+                return (await res.json()).candidates[0].content.parts[0].text;
+            }
+            static async ask(p, ctx) { return this.call({ contents: [{ parts: [{ text: `Data: ${JSON.stringify(ctx)}\nUser: ${p}` }] }], systemInstruction: { parts: [{ text: `คุณคือผู้เชี่ยวชาญด้านบริหารหนี้สิน ตอบสั้น กระชับ เป็นมิตร ใช้ภาษาไทย และจัดรูปแบบ Markdown ให้สวยงาม` }] } }); }
+            static async scan(b64) { return parseFloat((await this.call({ contents: [{ parts: [{ text: "Extract numbers from this slip image. Return ONLY the number." }, { inlineData: { mimeType: "image/jpeg", data: b64 } }] }] })).trim()) || 0; }
+            static async simulate(txt, id) { const el = document.getElementById(id); el.innerHTML = ''; let i = 0; return new Promise(r => { const f = () => { if (i < txt.length) { const c = Math.floor(Math.random()*3)+1; el.innerHTML += txt.substring(i, i+c).replace(/\n/g, '<br>'); i += c; document.getElementById('chat-history').scrollTop = 9999; requestAnimationFrame(f); } else r(); }; f(); }); }
+        }
+
+        const AppState = { debts: [], tx: [], metrics: null, chart: null, trendChart: null };
+
+        const App = {
+            async init() {
+                if (localStorage.getItem('theme') === 'dark') { document.documentElement.classList.add('dark'); document.getElementById('toggleDarkMode').checked = true; }
+                if (localStorage.getItem('privacy') === 'true') document.body.classList.add('privacy-mode');
+                await db.init();
+                this.events();
+                await this.load();
+                // Hide splash only after DB is ready — no arbitrary fixed delay
+                document.getElementById('splash-screen').classList.add('hidden');
+            },
+            async load() {
+                AppState.debts = await db.getAll(CONFIG.stores.debts);
+                AppState.tx    = await db.getAll(CONFIG.stores.tx);
+                worker.postMessage({ type: 'CALCULATE_METRICS', payload: AppState.debts, transactions: AppState.tx });
+            },
+            events() {
+                document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', e => UIManager.switchView(e.currentTarget.dataset.target)));
+
+                worker.onmessage = e => {
+                    AppState.metrics = e.data.data;
+                    document.getElementById('dash-total-debt').innerText   = `฿${formatMoney(AppState.metrics.totalDebt)}`;
+                    document.getElementById('dash-progress-bar').style.width = `${AppState.metrics.overallP}%`;
+                    document.getElementById('dash-progress').innerText     = `${AppState.metrics.overallP}%`;
+                    document.getElementById('dash-free-year').innerText    = AppState.metrics.freeYear;
+                    document.getElementById('dash-interest-burn').innerText= `฿${formatMoney(AppState.metrics.interestBurn)}`;
+                    document.getElementById('dash-monthly-pay').innerText  = `฿${formatMoney(AppState.metrics.totalMonthly)}`;
+                    document.getElementById('dash-target-name').innerText  = AppState.metrics.target;
+                    document.getElementById('dash-health-score').innerText = AppState.metrics.healthScore;
+                    document.getElementById('dash-paid-total').innerText   = `฿${formatMoney(AppState.metrics.initialTotal - AppState.metrics.totalDebt)}`;
+                    UIManager.renderCharts();
+                    this.renderList(AppState.metrics.debts);
+                };
+
+                document.getElementById('btnPrivacy').addEventListener('click', () => { const isP = document.body.classList.toggle('privacy-mode'); localStorage.setItem('privacy', isP); document.getElementById('icon-privacy').className = isP ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'; Haptic.play('click'); });
+                document.getElementById('fabAdd').addEventListener('click', () => { document.getElementById('form-debt').reset(); document.getElementById('debt-id').value = ''; document.getElementById('btnDeleteDebt').classList.add('hidden'); document.getElementById('modal-debt-title').innerText = "เพิ่มรายการใหม่"; UIManager.openModal('modal-debt'); });
+                document.getElementById('btnCloseDebtModal').addEventListener('click', () => UIManager.closeModal('modal-debt'));
+                document.getElementById('btnDeleteDebt').addEventListener('click', async () => { if (confirm("ต้องการลบรายการนี้ใช่หรือไม่?")) { await db.delete(CONFIG.stores.debts, document.getElementById('debt-id').value); UIManager.closeModal('modal-debt'); this.load(); } });
+                document.getElementById('form-debt').addEventListener('submit', async e => { e.preventDefault(); const id = document.getElementById('debt-id').value; await db.save(CONFIG.stores.debts, { id: id || generateId(), name: document.getElementById('debt-name').value, category: document.getElementById('debt-category').value, interest_rate: parseFloat(document.getElementById('debt-interest').value), initial_balance: parseFloat(document.getElementById('debt-initial').value), current_balance: parseFloat(document.getElementById('debt-current').value), min_payment: parseFloat(document.getElementById('debt-payment').value) }); UIManager.closeModal('modal-debt'); showToast("บันทึกข้อมูลแล้ว"); this.load(); });
+                // Guard against race condition when metrics not yet loaded
+                document.getElementById('sort-debts').addEventListener('change', () => { if (AppState.metrics) this.renderList(AppState.metrics.debts); });
+                document.getElementById('btnSettings').addEventListener('click', () => UIManager.openModal('modal-settings'));
+                document.getElementById('btnCloseSettings').addEventListener('click', () => UIManager.closeModal('modal-settings'));
+                document.getElementById('btnSaveKey').addEventListener('click', () => { localStorage.setItem('_gemini_api_key', document.getElementById('input-apikey').value); showToast("บันทึก API Key แล้ว"); });
+                document.getElementById('toggleDarkMode').addEventListener('change', e => { document.documentElement.classList.toggle('dark', e.target.checked); localStorage.setItem('theme', e.target.checked ? 'dark' : 'light'); UIManager.renderCharts(); });
+                document.getElementById('btnSendAI').addEventListener('click', () => this.chat());
+                document.getElementById('btnVoice').addEventListener('click', () => this.voice());
+                document.getElementById('btnCancelPay').addEventListener('click', () => UIManager.closeModal('modal-pay'));
+                document.getElementById('slip-upload').addEventListener('change', async e => { const f = e.target.files[0]; if (!f) return; const l = document.getElementById('ocr-loading'), i = document.getElementById('pay-amount'); l.classList.remove('hidden'); i.disabled = true; const r = new FileReader(); r.onload = async ev => { try { const amt = await AIService.scan(ev.target.result.split(',')[1]); if (amt) { i.value = amt; showToast("สแกนสลิปสำเร็จ"); } } catch { showToast("AI ไม่พบตัวเลข", "error"); } finally { l.classList.add('hidden'); i.disabled = false; } }; r.readAsDataURL(f); });
+                document.getElementById('form-pay').addEventListener('submit', async e => { e.preventDefault(); const id = document.getElementById('pay-debt-id').value, amt = parseFloat(document.getElementById('pay-amount').value), d = AppState.debts.find(x => x.id === id); if (d && amt > 0) { d.current_balance = Math.max(0, d.current_balance - amt); await db.save(CONFIG.stores.debts, d); await db.save(CONFIG.stores.tx, { id: generateId(), debt_id: id, amount_paid: amt, date: new Date().toISOString() }); UIManager.closeModal('modal-pay'); if (d.current_balance === 0) Confetti.shoot(); this.load(); } });
+
+                // ── Export ──────────────────────────────────────────────────────
+                document.getElementById('btnExport').addEventListener('click', async () => {
+                    const data = { debts: AppState.debts, transactions: AppState.tx, exported: new Date().toISOString() };
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url  = URL.createObjectURL(blob);
+                    const a    = document.createElement('a');
+                    a.href = url; a.download = `debt-manager-${new Date().toISOString().substring(0,10)}.json`;
+                    a.click(); URL.revokeObjectURL(url);
+                    showToast("ส่งออกข้อมูลสำเร็จ");
+                });
+
+                // ── Import ──────────────────────────────────────────────────────
+                document.getElementById('file-import').addEventListener('change', async e => {
+                    const f = e.target.files[0]; if (!f) return;
+                    const reader = new FileReader();
+                    reader.onload = async ev => {
+                        try {
+                            const data = JSON.parse(ev.target.result);
+                            if (!Array.isArray(data.debts)) throw new Error('invalid format');
+                            await db.clear();
+                            for (const d of data.debts)                await db.save(CONFIG.stores.debts, d);
+                            for (const t of (data.transactions || [])) await db.save(CONFIG.stores.tx, t);
+                            await App.load();
+                            UIManager.closeModal('modal-settings');
+                            showToast(`นำเข้าข้อมูลสำเร็จ (${data.debts.length} รายการ)`);
+                        } catch { showToast("ไฟล์ไม่ถูกต้องหรือเสียหาย", "error"); }
+                    };
+                    reader.readAsText(f);
+                    e.target.value = ''; // reset so same file can be re-imported
+                });
+
+                // ── Clear all data ──────────────────────────────────────────────
+                document.getElementById('btnClearData').addEventListener('click', async () => {
+                    if (!confirm("ต้องการล้างข้อมูลทั้งหมดใช่หรือไม่?\nไม่สามารถกู้คืนได้")) return;
+                    await db.clear();
+                    AppState.debts = []; AppState.tx = []; AppState.metrics = null;
+                    if (AppState.chart)      { AppState.chart.destroy();      AppState.chart      = null; }
+                    if (AppState.trendChart) { AppState.trendChart.destroy(); AppState.trendChart = null; }
+                    document.getElementById('chart-legend-details').innerHTML = '';
+                    UIManager.closeModal('modal-settings');
+                    await App.load();
+                    showToast("ล้างข้อมูลทั้งหมดแล้ว");
+                });
+            },
+            renderList(debts) {
+                const list = document.getElementById('debt-list'), empty = document.getElementById('debt-empty');
+                document.getElementById('debt-count').innerText = `${debts.length} รายการ`;
+                if (!debts.length) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
+                empty.classList.add('hidden');
+                const sort = document.getElementById('sort-debts').value;
+                let sorted = [...debts];
+                if (sort === 'balance_desc')  sorted.sort((a,b) => b.current_balance - a.current_balance);
+                else if (sort === 'interest_desc') sorted.sort((a,b) => b.interest_rate - a.interest_rate);
+                else if (sort === 'progress_desc') sorted.sort((a,b) => b.p - a.p);
+
+                list.innerHTML = sorted.map(d => {
+                    const isDone      = d.current_balance <= 0;
+                    const catColors   = CONFIG.colors[d.category] || CONFIG.colors.other;
+                    const warningClass= d.warning ? 'text-danger animate-pulse' : 'text-slate-400';
+                    const iconClass   = d.warning ? 'fa-triangle-exclamation' : 'fa-calendar-check';
+
+                    return `<div class="bg-white dark:bg-darkcard rounded-[2rem] p-6 shadow-soft border ${isDone ? 'border-success' : 'border-slate-100 dark:border-darkborder'} relative overflow-hidden transition-all">
+                        <div class="flex items-start gap-4 ${isDone ? 'opacity-50' : ''}">
+                            <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-inner shrink-0" style="background: ${catColors.fill}20; color: ${catColors.fill}"><i class="fa-solid ${d.category === 'home' ? 'fa-house' : d.category === 'car' ? 'fa-car' : 'fa-wallet'}"></i></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex justify-between items-start mb-1"><h3 class="font-black truncate pr-4 text-sm">${esc(d.name)}</h3><span class="text-[9px] font-black px-2 py-1 rounded-lg ${isDone ? 'bg-success text-white' : 'bg-slate-100 dark:bg-white/5'}">${isDone ? 'ปิดหนี้แล้ว!' : d.p + '%'}</span></div>
+                                <div class="flex justify-between items-end mt-3">
+                                    <div><p class="text-[9px] text-slate-400 uppercase tracking-widest mb-1">ยอดคงเหลือ</p><p class="font-black text-lg leading-none money-text">฿${formatMoney(d.current_balance)}</p></div>
+                                    <div class="text-right"><p class="text-[9px] text-slate-400 uppercase tracking-widest mb-1">ดบ. ${d.interest_rate}%</p><p class="text-[10px] font-bold text-slate-500 money-text">ผ่อน ฿${formatMoney(d.min_payment)}</p></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-100 dark:bg-white/5 h-2 rounded-full mt-5 overflow-hidden"><div class="h-full bg-gradient-to-r from-primary to-cyan-400 progress-fill" style="width: ${d.p}%"></div></div>
+                        <div class="mt-5 pt-4 border-t dark:border-darkborder flex justify-between items-center">
+                            <div class="flex flex-col">
+                                <div class="text-[9px] font-black uppercase tracking-widest ${warningClass} flex items-center gap-1">
+                                    <i class="fa-solid ${iconClass}"></i> จบหนี้: <span class="text-slate-800 dark:text-white">${d.freedomDate}</span>
+                                </div>
+                                <div class="text-[8px] font-bold text-slate-400 mt-0.5">เหลืออีก <span class="${d.warning ? 'text-danger' : 'text-primary'}">${d.monthsLeft}</span> งวด</div>
+                            </div>
+                            <div class="flex gap-2">
+                                ${!isDone ? `<button onclick="App.openPay('${d.id}')" class="bg-blue-50 dark:bg-primary/20 text-primary px-5 py-2.5 rounded-2xl text-[10px] font-black active:scale-90 transition-all">จ่าย</button>` : ''}
+                                <button onclick="App.edit('${d.id}')" class="bg-slate-50 dark:bg-white/5 text-slate-400 px-3 py-2.5 rounded-2xl transition-all active:scale-90"><i class="fa-solid fa-cog"></i></button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            },
+            async chat() {
+                const i = document.getElementById('ai-input'), v = i.value.trim(); if (!v) return;
+                i.value = ''; i.disabled = true;
+                const box = document.getElementById('chat-history'), id = `ai-${Date.now()}`;
+                box.innerHTML += `<div class="flex flex-row-reverse gap-3"><div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/5 flex items-center justify-center shrink-0"><i class="fa-solid fa-user text-[10px]"></i></div><div class="bg-primary text-white p-4 rounded-3xl rounded-tr-none shadow-md">${esc(v)}</div></div><div class="flex gap-3"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[10px] shrink-0 font-bold">AI</div><div class="bg-slate-100 dark:bg-white/5 p-4 rounded-3xl rounded-tl-none border dark:border-white/5" id="${id}">...</div></div>`;
+                box.scrollTop = box.scrollHeight;
+                try { const res = await AIService.ask(v, AppState.metrics.debts.map(x => ({ n: x.name, b: x.current_balance }))); await AIService.simulate(res, id); }
+                catch { document.getElementById(id).innerText = "ไม่สามารถเชื่อมต่อ AI ได้ กรุณาเช็คอินเทอร์เน็ตหรือ API Key"; }
+                finally { i.disabled = false; i.focus(); }
+            },
+            voice() { const S = window.SpeechRecognition || window.webkitSpeechRecognition; if (!S) return showToast("เบราว์เซอร์ไม่รองรับคำสั่งเสียง", "error"); const r = new S(); r.lang = 'th-TH'; r.onstart = () => { document.getElementById('btnVoice').classList.add('recording-pulse'); Haptic.play('click'); }; r.onresult = e => { document.getElementById('ai-input').value = e.results[0][0].transcript; this.chat(); }; r.onend = () => document.getElementById('btnVoice').classList.remove('recording-pulse'); r.start(); },
+            openPay(id) { const d = AppState.debts.find(x => x.id === id); document.getElementById('pay-debt-id').value = id; document.getElementById('pay-debt-name').innerText = d.name; document.getElementById('pay-amount').value = ''; UIManager.openModal('modal-pay'); },
+            edit(id) { const d = AppState.debts.find(x => x.id === id); document.getElementById('debt-id').value = id; ['name','category','interest','initial','current','payment'].forEach(k => document.getElementById(`debt-${k}`).value = d[k==='interest'?'interest_rate':k==='initial'?'initial_balance':k==='current'?'current_balance':k==='payment'?'min_payment':k]); document.getElementById('modal-debt-title').innerText = "แก้ไขข้อมูล"; document.getElementById('btnDeleteDebt').classList.remove('hidden'); UIManager.openModal('modal-debt'); }
+        };
+
+        window.onload = () => App.init();
+    </script>
+</body>
+</html>
