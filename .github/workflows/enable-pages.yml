@@ -1,0 +1,42 @@
+name: Enable GitHub Pages (run once)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  enable-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Enable Pages via GitHub API
+        run: |
+          # Try to enable Pages with GitHub Actions as source
+          gh api repos/$GITHUB_REPOSITORY/pages \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -f build_type=workflow \
+          && echo "Pages enabled successfully" \
+          || gh api repos/$GITHUB_REPOSITORY/pages \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -f build_type=workflow \
+          && echo "Pages updated to GitHub Actions source" \
+          || echo "Pages already configured — skipping"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Trigger deploy workflow
+        run: |
+          gh api repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/dispatches \
+            --method POST \
+            -f ref=main \
+          && echo "Deploy triggered" || echo "Deploy trigger skipped"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
