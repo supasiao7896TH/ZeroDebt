@@ -147,9 +147,13 @@
                             <button onclick="UIManager.toggleChart('line')" id="btnChartLine" class="px-3 py-1 text-[10px] font-bold rounded-lg text-slate-400">แนวโน้ม</button>
                         </div>
                     </div>
-                    <div class="relative h-48 w-full flex justify-center items-center">
-                        <canvas id="debtChart"></canvas>
-                        <canvas id="trendChart" class="hidden"></canvas>
+                    <div class="relative h-48 w-full overflow-hidden">
+                        <div id="donut-wrap" class="absolute inset-0 flex items-center justify-center">
+                            <div class="relative w-48 h-48">
+                                <canvas id="debtChart"></canvas>
+                            </div>
+                        </div>
+                        <canvas id="trendChart" class="hidden absolute inset-0 w-full h-full"></canvas>
                     </div>
                     <div id="chart-legend-details" class="mt-6 space-y-3"></div>
                 </div>
@@ -322,10 +326,17 @@
                 if (id === 'view-dashboard') this.renderCharts();
             },
             toggleChart(type) {
-                const donut = document.getElementById('debtChart'), trend = document.getElementById('trendChart');
+                const donutWrap = document.getElementById('donut-wrap'), trend = document.getElementById('trendChart');
                 const btnD = document.getElementById('btnChartDonut'), btnT = document.getElementById('btnChartLine');
-                if (type === 'donut') { donut.classList.remove('hidden'); trend.classList.add('hidden'); btnD.classList.add('bg-white', 'dark:bg-darkcard', 'shadow-sm'); btnD.classList.remove('text-slate-400'); btnT.classList.add('text-slate-400'); btnT.classList.remove('bg-white', 'dark:bg-darkcard', 'shadow-sm'); }
-                else { trend.classList.remove('hidden'); donut.classList.add('hidden'); btnT.classList.add('bg-white', 'dark:bg-darkcard', 'shadow-sm'); btnT.classList.remove('text-slate-400'); btnD.classList.add('text-slate-400'); btnD.classList.remove('bg-white', 'dark:bg-darkcard', 'shadow-sm'); }
+                if (type === 'donut') {
+                    donutWrap.classList.remove('hidden'); trend.classList.add('hidden');
+                    btnD.classList.add('bg-white', 'dark:bg-darkcard', 'shadow-sm'); btnD.classList.remove('text-slate-400');
+                    btnT.classList.add('text-slate-400'); btnT.classList.remove('bg-white', 'dark:bg-darkcard', 'shadow-sm');
+                } else {
+                    trend.classList.remove('hidden'); donutWrap.classList.add('hidden');
+                    btnT.classList.add('bg-white', 'dark:bg-darkcard', 'shadow-sm'); btnT.classList.remove('text-slate-400');
+                    btnD.classList.add('text-slate-400'); btnD.classList.remove('bg-white', 'dark:bg-darkcard', 'shadow-sm');
+                }
                 this.renderCharts();
             },
             renderCharts() {
